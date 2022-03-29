@@ -1359,7 +1359,7 @@ def get_zoom_matrix(zooms, image_height, image_width, name=None):
 @keras_export('keras.layers.RandomContrast',
               'keras.layers.experimental.preprocessing.RandomContrast',
               v1=[])
-class RandomContrast(base_layer.BaseRandomLayer):
+class RandomContrast(BaseImageAugmentationLayer):
   """A preprocessing layer which randomly adjusts contrast during training.
 
   This layer will randomly adjust the contrast of an image or images by a random
@@ -1412,25 +1412,20 @@ class RandomContrast(base_layer.BaseRandomLayer):
                        ' got {}'.format(factor))
     self.seed = seed
 
-  def call(self, inputs, training=True):
-    inputs = utils.ensure_tensor(inputs, self.compute_dtype)
-    def random_contrasted_inputs(inputs):
-      seed = self._random_generator.make_seed_for_stateless_op()
-      if seed is not None:
-        output = tf.image.stateless_random_contrast(
-            inputs, 1. - self.lower, 1. + self.upper, seed=seed)
-      else:
-        output = tf.image.random_contrast(
-            inputs, 1. - self.lower, 1. + self.upper,
-            seed=self._random_generator.make_legacy_seed())
-      output = tf.clip_by_value(output, 0, 255)
-      output.set_shape(inputs.shape)
-      return output
+  def get_random_transformation(self,
+                                image=None,
+                                label=None,
+                                bounding_box=None):
+    random_seed = self._random_generator.make_seed_for_stateless_op()
+    return {'random_seed': random_seed}
 
-    if training:
-      return random_contrasted_inputs(inputs)
-    else:
-      return inputs
+  def augment_image(self, image, transformation=None):
+    seed = transformation['random_seed']
+    output = tf.image.stateless_random_contrast(
+        image, 1. - self.lower, 1. + self.upper, seed=seed)
+    output = tf.clip_by_value(output, 0, 255)
+    output.set_shape(image.shape)
+    return output
 
   def compute_output_shape(self, input_shape):
     return input_shape
